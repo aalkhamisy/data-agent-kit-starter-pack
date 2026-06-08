@@ -8,7 +8,7 @@ description: |
     3. BigQuery ML/AI functions.
 license: Apache-2.0
 metadata:
-   version: v1
+  version: v1
   publisher: google
 ---
 
