@@ -37,11 +37,12 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install skills-ref
+      - name: Install dependencies
         run: |
           pip install "git+https://github.com/agentskills/agentskills.git#subdirectory=skills-ref"
+          pip install pyyaml
 
-      - name: Validate Skills
+      - name: Validate Skills Spec (skills-ref)
         run: |
           failed=0
           for skill_dir in skills/*/; do
@@ -54,3 +55,6 @@ jobs:
             fi
           done
           exit $failed
+
+      - name: Validate Required Metadata (publisher & license)
+        run: python .github/scripts/validate_skills.py
