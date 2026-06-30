@@ -1,0 +1,261 @@
+# proto-file: learning/gemini/agents/evaluation/evalin/proto/eval_suite.proto
+# proto-message: EvalSuite
+# txtpbfmt: wrap_strings_after_newlines
+
+suite_name: "GCS Security Assessment Skill Evals"
+timeout_seconds: 600
+cases {
+  name: "phase1_no_project_provided"
+  prompt: "Perform a GCS security assessment"
+  expectations: "The agent asked the user to provide a project id."
+  expectations:
+    "The agent must identify that no project_id was provided in the prompt. "
+    "According to the skill, it must ask the user to provide a project id."
+}
+cases {
+  name: "phase1_no_linked_datasets"
+  prompt:
+    "Perform a GCS security assessment for project "
+    "'si-agent-skill-test-no-dataset' in location 'us-central1'."
+  expectations:
+    "The agent attempted to discover the available Storage Insights datasets "
+    "for the project."
+  expectations:
+    "The agent identified that no dataset was provided in the prompt. "
+    "According to the skill, it must attempt to discover the available Storage "
+    "Insights datasets for project 'si-agent-skill-test-no-dataset' in location "
+    "'us-central1' before proceeding."
+}
+cases {
+  name: "phase1_project_no_dataset_provided_one_found"
+  prompt: "Perform a GCS security assessment for project 'si-agent-skill-test'"
+  expectations:
+    "The agent identified that no dataset was provided in the prompt. "
+    "According to the skill, the agent must attempt to discover the available "
+    "Storage Insights datasets for project 'si-agent-skill-test'."
+  expectations: "The agent discovered exactly one available dataset."
+  expectations:
+    "The agent proceeded to run a preflight permissions check for project "
+    "'si-agent-skill-test', using the single discovered dataset as the dataset "
+    "name."
+}
+cases {
+  name: "phase1_project_no_dataset_provided_multiple_found"
+  prompt:
+    "Perform a GCS security assessment for project "
+    "'si-agent-skill-test-2'."
+  expectations:
+    "The agent identified that no dataset was provided in the prompt. "
+    "According to the skill, the agent must attempt to discover the available "
+    "Storage Insights datasets for project 'si-agent-skill-test-2'."
+  expectations:
+    "The agent discovered multiple available datasets, including one whose "
+    "name begins with 'all_buckets_config' and one whose name begins with "
+    "'public_bucket_config'."
+  expectations:
+    "The agent STOPPED and asked the user to choose a dataset before "
+    "proceeding. It did NOT auto-select a dataset, and it did NOT gather any "
+    "telemetry or otherwise begin the assessment before the user responded."
+  expectations:
+    "The agent recommended the 'all_buckets_config' dataset as its suggested "
+    "default, with a one-line rationale that it provides comprehensive "
+    "coverage of all buckets (which a complete security assessment requires). "
+    "The agent did NOT recommend 'public_bucket_config'."
+}
+cases {
+  name: "phase1_telemetry_scripts_run_successfully"
+  prompt:
+    "Perform a GCS security assessment for project si-agent-skill-test and "
+    "dataset si_agent_skill_test_prod_13663c85_e5e6_4393_8908_dce947c08da0."
+  expectations:
+    "The agent proceeds to read references/phases/discover.md for Phase 1 "
+    "instructions."
+  expectations:
+    "The agent invokes scripts/preflight_permissions.py with project_id "
+    "'si-agent-skill-test' and dataset_name "
+    "'si_agent_skill_test_prod_13663c85_e5e6_4393_8908_dce947c08da0'."
+  expectations:
+    "The agent invokes scripts/fetch_bucket_telemetry.py with project_id "
+    "'si-agent-skill-test' and dataset_name "
+    "'si_agent_skill_test_prod_13663c85_e5e6_4393_8908_dce947c08da0'."
+  expectations:
+    "The agent invokes scripts/fetch_object_telemetry.py with project_id "
+    "'si-agent-skill-test' and dataset_name "
+    "'si_agent_skill_test_prod_13663c85_e5e6_4393_8908_dce947c08da0'."
+  expectations:
+    "The agent invokes scripts/evaluate_project_security_posture.py with "
+    "project_id 'si-agent-skill-test'."
+  expectations:
+    "The agent proceeds to read references/phases/classification.md for Phase "
+    "2."
+}
+cases {
+  name: "cuj0_baseline_security"
+  prompt:
+    "Perform a GCS security assessment for project 'si-agent-skill-baseline-broken' "
+    "and dataset "
+    "'all_buckets_config_fb702ab0_1e58_449b_891b_f3c30f3ca60c'."
+
+  # --- Independence and labeling ---
+  expectations:
+    "Each failing baseline control is reported as its own discrete finding. "
+    "For example, UBLA, Block HTTP, TLS, HMAC, and Audit Logs appear as separate items "
+    "in Section 2 (in the per-control rollup or as distinct rows), not "
+    "merged into a single combined entry."
+  # TODO: Re-enable once the bounds between baseline and
+  # toxic-combination archetypes are clear.
+  # expectations:
+  #   "The report does NOT label a bucket that fails only baseline controls "
+  #   "with a named toxic-combination archetype from "
+  #   "references/toxic_combinations.md (e.g., 'Public Data Pipeline', "
+  #   "'Silent Data Theft', 'Irreversible Data Corruption'). The literal "
+  #   "label 'Baseline failures' is acceptable for such buckets."
+
+  # --- UBLA finding ---
+  expectations:
+    "Section 2's per-control rollup states a count of UBLA-failing buckets "
+    "equal to 5."
+  expectations:
+    "The report names all 5 UBLA-failing buckets from the fixture: "
+    "'si-agent-baseline-broken-us-east1-1', 'si-agent-baseline-broken-us-east1-2', "
+    "'si-agent-baseline-broken-us-east1-3', 'si-agent-baseline-broken-us-east1-4', "
+    "and 'si-agent-baseline-broken-us-east1-5'."
+  expectations:
+    "The report does NOT replace the UBLA bucket list with a vague rollup "
+    "such as 'X additional buckets assessed — no critical findings' that "
+    "hides failing buckets."
+  expectations:
+    "For UBLA failures, the report provides the remediation 'gcloud storage "
+    "buckets update gs://BUCKET --uniform-bucket-level-access'."
+  expectations:
+    "For UBLA failures, the report includes a 'Why it matters' rationale "
+    "citing legacy-ACL shadow access paths."
+
+  # --- TLS finding ---
+  expectations:
+    "The report flags minimum TLS version as not restricted to 1.2 or "
+    "higher (project posture shows gcp.restrictTLSVersion = false)."
+  expectations: "The report recommends enforcing minimum TLS 1.2 via an org policy fix."
+
+  # --- Block HTTP finding ---
+  expectations:
+    "The report flags secure transport (Block HTTP) as not enforced "
+    "(project posture shows secureHttpTransport = false)."
+  expectations: "The report recommends enforcing secure transport via an org policy fix."
+
+  # --- HMAC Key Restriction finding ---
+  expectations:
+    "The report flags HMAC key creation restriction as not enforced "
+    "(project posture shows disableServiceAccountHmacKeyCreation = false)."
+  expectations: "The report recommends restricting HMAC key creation via an org policy fix."
+
+  # --- Audit Logs finding ---
+  expectations:
+    "The report flags Data Access Audit Logs as disabled "
+    "(project posture shows DATA_READ and DATA_WRITE both disabled)."
+  expectations: "The report recommends enabling Data Access Audit Logs."
+
+  # --- VPC-SC finding ---
+  expectations: "The report points out that the project is not protected by a VPC-SC perimeter."
+  expectations: "The report recommends enabling VPC-SC across the Storage API."
+
+  # --- Output structure ---
+  expectations:
+    "Baseline failures appear in the Section 2 per-control rollup lines "
+    "and/or in Section 3 per-bucket cards. They do NOT appear as a separate "
+    "untitled list outside the defined output sections."
+}
+cases {
+  name: "phase1_no_si_runs_project_only"
+  prompt:
+    "Perform a GCS security assessment for project "
+    "'si-agent-skill-test-no-si' and dataset 'placeholder_dataset'."
+  expectations:
+    "The agent runs a preflight permissions check for project "
+    "'si-agent-skill-test-no-si' with dataset name 'placeholder_dataset'."
+  expectations:
+    "The agent determines that the Storage Insights API is not enabled, but "
+    "that it can still proceed with a project-level assessment (the missing "
+    "Storage Insights capability does not block the assessment)."
+  expectations:
+    "The agent recommends enabling the Storage Insights API via 'gcloud "
+    "services enable storageinsights.googleapis.com --project "
+    "si-agent-skill-test-no-si' to unlock the full bucket- and object-level "
+    "assessment."
+  expectations:
+    "The agent does NOT bail out. It does NOT claim the skill is only "
+    "available to Storage Intelligence customers. Instead it proceeds with a "
+    "project-level assessment."
+  expectations:
+    "The agent gathers ONLY project-level security posture telemetry. It does "
+    "NOT gather bucket-level or object-level telemetry (those require Storage "
+    "Intelligence)."
+  expectations:
+    "The agent produces a project-level report containing project-level "
+    "findings such as IAM, VPC-SC, Data Access audit logs, org policies, and "
+    "Model Armor posture. Bucket- and object-level sections are marked "
+    "'Unavailable - requires Storage Intelligence', not passing or failing."
+}
+cases {
+  name: "public_pii_bucket_critical_finding"
+  prompt:
+    "Perform a GCS security assessment for project si-agent-skill-test and "
+    "dataset si_agent_skill_test_prod_13663c85_e5e6_4393_8908_dce947c08da0 and "
+    "the bucket gs://customer-pii-sensitive-12232421412."
+  expectations:
+    "The agent returns a risk dashboard with one bucket named "
+    "gs://customer-pii-sensitive-12232421412."
+  expectations: "The agent finding returned in the risk dashboard has severity 'CRITICAL'."
+  expectations:
+    "The agent is marked as a risk because there's inferred PII and the bucket "
+    "is publicly accessible."
+  expectations: "The agent notes that the finding is labeled as HIGH sensitivity based on SDP tagging."
+  expectations:
+    "The agent recommends turning on public access prevention using an "
+    "accurate gcloud command."
+}
+
+cases {
+  name: "public_data_pipeline_cuj"
+  prompt:
+    "Perform a GCS security assessment for project si-agent-skill-test-2 and "
+    "dataset all_buckets_config_d9e072f4_1726_433c_a4eb_779dfc4364e4 and the "
+    "bucket gs://crazy-bucket-loca."
+  expectations:
+    "The agent returns a risk dashboard with one bucket named "
+    "gs://crazy-bucket-loca."
+  expectations: "The agent finding returned in the risk dashboard has severity 'CRITICAL'."
+  expectations: "The agent notes that the finding is labeled as HIGH sensitivity based on SDP tagging."
+  expectations: "The agent marks the finding as a risk because of the bucket's public accessibility."
+  expectations: "The agent shows that UBLA is disabled for the bucket."
+  expectations: "The agent warns that the encryption used is GMEK and should be CMEK."
+  expectations: "The agent points out that the project is not protected by a VPC-SC perimeter."
+  expectations: "The agent points out that DATA_READ logs are disabled."
+  expectations: "The agent asserts that these findings result in a public data pipeline toxic combination."
+
+  # Remediations
+  expectations: "The agent recommends enforcing UBLA with a relevant gcloud command."
+  expectations: "The agent recommends enabling CMEK with reference to the documentation."
+  expectations: "The agent recommends enabling VPC-SC across the Storage API."
+  expectations: "The agent recommends enabling DATA_READ logs for storage APIs."
+}
+
+cases {
+  name: "intentional_public_data_cuj"
+  prompt:
+    "Perform a GCS security assessment for project si-agent-skill-test-2 and "
+    "dataset all_buckets_config_d9e072f4_1726_433c_a4eb_779dfc4364e4 and the "
+    "bucket gs://my-sweet-public-child."
+  expectations: "The agent returns a risk dashboard with one bucket named gs://my-sweet-public-child."
+  expectations: "The agent notes that the bucket is non-sensitive and has a low severity as it is intentionally public."
+  expectations: "The agent confirms that UBLA is enabled on the bucket."
+  expectations: "The agent points out that object versioning is disabled."
+  expectations: "The agent points out that soft delete is disabled."
+  expectations: "The agent points out that DATA_READ logs are disabled."
+
+  # Remediations
+  expectations: "The agent recommends enabling object versioning using a relevant gcloud command."
+  expectations: "The agent recommends enabling soft delete using a relevant gcloud command."
+  expectations: "The agent recommends enabling DATA_READ logs for Storage APIs."
+  expectations: "The agent recognizes that the bucket is intentionally public and does not recommend restricting public access."
+}
